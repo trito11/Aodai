@@ -20,8 +20,8 @@ import pickle
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
-result_train=list()
-result_test=list()
+result_train2=list()
+result_test2=list()
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
@@ -43,8 +43,7 @@ class ReplayMemory(object):
         return random.sample(self.memory, batch_size)
     def __len__(self):
         return len(self.memory)
-
-
+replay = ReplayMemory(10000)
 class DQNnet(nn.Module):
     def __init__(self,n_observations,n_actions):
         super(DQNnet,self).__init__()
@@ -65,7 +64,11 @@ class DQNAgent:
         self.eps_start=0.9
         self.eps_end=0.05
         self.eps_decay=1000
-        self.tau=0.05
+        self.tau_start=0.5
+        self.tau_end=0.01
+        self.tau_decay=1000
+        self.tau1=0.05
+        self.tau2=0.
         self.lr=1e-4
         self.n_actions=NUM_ACTION
         self.n_observations=NUM_STATE
@@ -73,12 +76,11 @@ class DQNAgent:
         self.target_net=DQNnet(self.n_observations,self.n_actions).to(device)
         self.save_net=DQNnet(self.n_observations,self.n_actions).to(device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_net.eval()
         self.save_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer=optim.AdamW(self.policy_net.parameters(),lr=self.lr,amsgrad=True)
         self.memory=ReplayMemory(10000)
-        self.papameter=ReplayMemory(16000)
         self.stepdone=0
+        self.stepdone1=0
     def select_action(self,state):
             sample=random.random()
             eps_threshold=self.eps_end+(self.eps_start-self.eps_end)*math.exp(-1.*self.stepdone/self.eps_decay)
@@ -103,7 +105,7 @@ class DQNAgent:
                                                         if s is not None])
             batch_state=[]
             for i in batch.state :
-                batch_state.append(i.view(1,14))
+                batch_state.append(i.view(1,15))
             state_batch = torch.cat(batch_state)
             action_batch = torch.cat(batch.action)
 
@@ -115,9 +117,8 @@ class DQNAgent:
 
             next_state_values = torch.zeros(self.batch_size, device=device)
             with torch.no_grad():
-                # next_state_values[non_final_mask] =self.target_net(non_final_next_states).max(1)[0]
-                # print('b',self.target_net(non_final_next_states).gather(1,self.policy_net(non_final_next_states).max(1)[1].unsqueeze(0)))
-                next_state_values[non_final_mask] =self.target_net(non_final_next_states).gather(1,self.policy_net(non_final_next_states).max(1)[1].unsqueeze(0))
+                 next_state_values[non_final_mask] =self.target_net(non_final_next_states).max(1)[0]
+                # next_state_values[non_final_mask] =self.policy_net(non_final_next_states).gather(1,self.target_net(non_final_next_states).max(1)[1].unsqueeze(0))
                 
             # Compute the expected Q values
             expected_state_action_values = (next_state_values * gamma) + reward_batch
@@ -133,6 +134,7 @@ class DQNAgent:
             # In-place gradient clipping
             torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
             self.optimizer.step()
+            self.optimize+=1
             # self.end_time=time.time()
             # print(f"optimze_time:{self.end_time-self.start_time},times{self.optimize}")
     def train(self,num_iters,num_episodes,duration,gamma):
@@ -155,7 +157,7 @@ class DQNAgent:
                                 next_state = None
                                 print('Episode: {}, Score: {}'.format(
                                     episode, self.env.old_avg_reward))
-                                result_train.append(self.env.old_avg_reward*-800)
+                                result_train2.append(self.env.old_avg_reward*-800)
 
                                 break
                             
@@ -167,15 +169,21 @@ class DQNAgent:
                             state = next_state
 
                             self.optimize_model(gamma)
-
+                            self.tau=self.tau_end+(self.tau_start-self.tau_end)*math.exp(-1.*self.stepdone1/self.tau_decay)
+                            self.stepdone1+=0.005
              
+                            
                             target_net_state_dict = self.target_net.state_dict()
                             policy_net_state_dict = self.policy_net.state_dict()
+                            save_net_state_dict = self.save_net.state_dict()
                             
                             for key in policy_net_state_dict:
-                                target_net_state_dict[key] = policy_net_state_dict[key]*self.tau + target_net_state_dict[key]*(1-self.tau)
+                                target_net_state_dict[key] = policy_net_state_dict[key]*self.tau1 + target_net_state_dict[key]*(1-self.tau1)
+                                save_net_state_dict[key] = policy_net_state_dict[key]*self.tau2 + save_net_state_dict[key]*(1-self.tau2)
+
                             self.target_net.load_state_dict(target_net_state_dict)
-                            
+                            self.save_net.load_state_dict(save_net_state_dict)
+                            self.policy_net.load_state_dict(save_net_state_dict)
 
     def test(self,num_episodes):
             
@@ -194,13 +202,13 @@ class DQNAgent:
                     state = next_state
 
                 print('Test Episode: {}, Score: {}'.format(episode, self.env.old_avg_reward))
-                result_test.append(self.env.old_avg_reward*-800)
+                result_test2.append(self.env.old_avg_reward*-800)
     def runAC(self,i, dur,gamma):
     # MyGlobals.folder_name = "Actor_Critic_800_30s/dur" + str(dur) + "/" + str(i) +'/'
         MyGlobals.folder_name = f"test/gamma{gamma}/dur{dur}/{i}/"
         self.train(num_iters=9, num_episodes=121,
             duration=dur,gamma=gamma )
-        self.test( num_episodes=31, )
+        self.test( num_episodes=60, )
 
 Agent=DQNAgent()
-Agent.runAC(1,30,0.99)
+Agent.runAC(1,10,0.99)

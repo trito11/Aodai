@@ -1,4 +1,4 @@
-#from code.config import Config, DATA_DIR, RESULT
+# from config import Config, DATA_DIR
 import numpy as np
 import pandas as pd
 import gym
@@ -15,23 +15,22 @@ from MyGlobal import MyGlobals
 class BusEnv(gym.Env):
 
     def __init__(self, env=None):
+        #khởi tạo mt
         self.env = env
+
         self.guess_count = 0
         self.number = 1
+        #các tác vụ thực hiện
         self.n_tasks_in_node = [0] * (NUM_ACTION)
+        # phân bổ delay
         self.n_tasks_delay_allocation = [0] * (NUM_ACTION)
         #self.n_tasks_drop_allocation = [0] * (NUM_ACTION)
         self.n_tasks_extra_allocation = [0] * (NUM_ACTION)
         self.n_tasks_sum_extra_allocation = [0] * (NUM_ACTION)
         self.action_space = spaces.Discrete(NUM_ACTION)
+    
         self.observation_space = spaces.Box(0, 100, [NUM_STATE])
-        # streaming data of localtion of three bus with(900, 901, 902)
-        # data900 = pd.read_excel(os.path.join(DATA_DIR, "data9000.xlsx"), index_col=0).to_numpy()
-        # data900 = data900[:, 13:15]
-        # data901 = pd.read_excel(os.path.join(DATA_DIR, "data9001.xlsx"), index_col=0).to_numpy()
-        # data901 = data901[:, 13:15]
-        # data902 = pd.read_excel(os.path.join(DATA_DIR , "data9002.xlsx"), index_col=0).to_numpy()
-        # data902 = data902[:, 13:15]
+        self.alpha=0.8
 
         data900 = self.preprocessBusLoction("xe1.xlsx")
         data901 = self.preprocessBusLoction("xe2.xlsx")
@@ -136,6 +135,7 @@ class BusEnv(gym.Env):
         self.seed()
 
     def replay(self):
+        #cập nhật data từ file excel 
         data900 = self.preprocessBusLoction("xe1.xlsx")
         data901 = self.preprocessBusLoction("xe2.xlsx")
         data902 = self.preprocessBusLoction("xe3.xlsx")
@@ -191,8 +191,10 @@ class BusEnv(gym.Env):
         self.data_bus = {"900": data900, "901": data901, "902": data902, "903": data903, "904": data904, "905": data905, "906": data906, "907": data907, "908": data908, "909": data909, "910": data910, "911": data911, "912": data912, "913": data913, "914": data914, "915": data915, "916": data916, "917": data917, "918": data918, "919": data919, "920": data920, "921": data921, "922": data922, "923": data923, "924": data924,
                          "925": data925, "926": data926, "927": data927, "928": data928, "929": data929, "930": data930, "931": data931, "932": data932, "933": data933, "934": data934, "935": data935, "936": data936, "937": data937, "938": data938, "939": data939, "940": data940, "941": data941, "942": data942, "943": data943, "944": data944, "945": data945, "946": data946, "947": data947, "948": data948, "949": data949, "950": data950}
         self.index_of_episode = -1
+        #cập nhật là đầu episode
 
     def preprocessBusLoction(self, excel_file):
+        #địa chỉ bus
         a = pd.read_excel(os.path.join(DATA_DIR, excel_file)).to_numpy()
         a = a[:500, 9:11]
         temp = np.zeros(a.shape)
@@ -201,6 +203,7 @@ class BusEnv(gym.Env):
         return a
 
     def readexcel(self, number_bus, time):
+        #đọc excel tính khoảng cách xe tại t=time
         data = self.data_bus[str(number_bus)]
 
         after_time = data[data[:, 1] >= time]
@@ -220,24 +223,27 @@ class BusEnv(gym.Env):
     def step(self, action):
         #action += 1
         time_delay = 0
+        drop_out=0
 
         # logic block when computing node is bus node
-        if action > 0 and action < NUM_EDGE_SERVER:
+        if action > 1 and action < NUM_EDGE_SERVER+1:
             # v(A, F)
-            distance_req = self.observation[(action-1)*2]
-            old_waiting_queue = self.observation[1+(action-1)*2]
+            distance_req = self.observation[(action)*2]
+            #khoảng cách yêu cầu
+            old_waiting_queue = self.observation[1+(action)*2]
+            #hàng đợi cũ
             Rate_trans_req_data = getRateTransData(channel_banwidth=CHANNEL_BANDWIDTH, pr=Pr, distance=distance_req,
                                                    path_loss_exponent=PATH_LOSS_EXPONENT, sigmasquare=SIGMASquare)
 
             # print('rate:', Rate_trans_req_data, distance_req)
             # waiting queue                        # computation required / computation
 
-            new_waiting_queue = self.observation[-3] / (List_COMPUTATION[action-1])       \
-                + max(self.observation[-2]/(Rate_trans_req_data),  # size of task / rate
+            new_waiting_queue = self.observation[0] / (List_COMPUTATION[action-2])       \
+                + max(self.observation[1]/(Rate_trans_req_data),  # size of task / rate
                       old_waiting_queue)
             # print(self.observation[1+(action-1)*2])
             distance_response = self.readexcel(
-                900+action-1, self.observation[1+(action-1)*2]+self.time)
+                900+action-2, self.observation[1+(action)*2]+self.time)
 
             Rate_trans_res_data = getRateTransData(channel_banwidth=CHANNEL_BANDWIDTH, pr=Pr, distance=distance_response,
                                                    path_loss_exponent=PATH_LOSS_EXPONENT, sigmasquare=SIGMASquare)
@@ -245,22 +251,24 @@ class BusEnv(gym.Env):
             time_delay = new_waiting_queue + \
                 self.queue[0][3]/(Rate_trans_res_data)
             # execpt: print(self.queue)
-            self.observation[1+(action-1)*2] = new_waiting_queue
+            self.observation[1+(action)*2] = new_waiting_queue
 
         # logic block when computing node is server
-        elif action == 0:
+        elif action == 1:
             # queue time += size of task / computation
-            self.observation[-4] += self.observation[-3] / \
+            self.observation[3] += self.observation[0] / \
                 (COMPUTATIONAL_CAPACITY_LOCAL)
             #import pdb;pdb.set_trace()
 
-            time_delay = self.observation[-4]
+            time_delay = self.observation[3]
 
         else:
             #print(self.queue[0][2], self.queue[0][3], self.observation[-3])
-            time_delay = (self.queue[0][2] + self.queue[0][3]) / TRANS_RATE_EDGE_TO_CLOUD + \
-                self.observation[-3]/(COMPUTATIONAL_CAPACITY_CLOUD)
+            # time_delay = (self.queue[0][2] + self.queue[0][3]) / TRANS_RATE_EDGE_TO_CLOUD + \
+            #     self.observation[-3]/(COMPUTATIONAL_CAPACITY_CLOUD)
             # print(time_delay)
+            drop_out=1 
+            time_delay = self.observation[2]
 
         # action -= 1
 
@@ -273,12 +281,13 @@ class BusEnv(gym.Env):
         # if drop_task == 1:
         #     self.sum_delay = time_delay - self.observation[-1]
         self.sum_delay = self.sum_delay + time_delay
-        extra_time = min(0, self.observation[-1] - time_delay)
+        #extra_time: thời gian thừa=deadline-timedelay
+        extra_time = min(0, self.observation[2] - time_delay)
         self.n_tasks_extra_allocation[action] += extra_time
 
         #reward = 1 if (self.observation[-1] >= time_delay) else -100
         #reward = -time_delay
-        reward = extra_time
+        reward = extra_time - drop_out*self.alpha*self.observation[0]/self.observation[2]
 
         # self.node_computing.write(",{}\n".format(reward))
 
@@ -300,28 +309,29 @@ class BusEnv(gym.Env):
             # print(self.queue)
 
             # position of cars
-            for a in range(NUM_VEHICLE):
-                self.observation[a*2] = self.readexcel(900+a, self.data[0][0])
+            for i in range(NUM_VEHICLE):
+                self.observation[i * 2 + 4] = self.readexcel(900+i, self.data[0][0])
 
             time = self.data[0][0] - self.time
             for i in range(NUM_VEHICLE):
                 self.observation[2 * i +
-                                 1] = max(0, self.observation[2 * i + 1]-time)
+                                 5] = max(0, self.observation[2 * i + 5]-time)
 
-            self.observation[-4] = max(0, self.observation[-4]-time)
+            self.observation[3] = max(0, self.observation[3]-time)
             self.time = self.data[0][0]
             self.data = self.data[self.data[:, 0] != self.data[0, 0]]
 
         if len(self.queue) != 0:
-            self.observation[-3] = self.queue[0][1]
-            self.observation[-2] = self.queue[0][2]
-            self.observation[-1] = self.queue[0][4]
+        
+            self.observation[0] = self.queue[0][1]
+            self.observation[1] = self.queue[0][2]
+            self.observation[2] = self.queue[0][4]
 
         # check end of episode?
         done = len(self.queue) == 0 and len(self.data) == 0
         self.sum_reward += reward
         self.sum_reward_accumulate += reward
-        if self.observation[-1] < time_delay:
+        if self.observation[2] < time_delay:
             self.sum_drop += 1
             #self.n_tasks_drop_allocation[action] += 1
         self.nreward += 1
@@ -366,32 +376,32 @@ class BusEnv(gym.Env):
 
     def estimate(self, action):
         time_delay = 0
-        deadline = self.observation[-1]
+        deadline = self.observation[2]
         #action += 1
 
         # bus
-        if action > 0 and action < NUM_EDGE_SERVER:
+        if action > 1 and action < NUM_EDGE_SERVER+1:
             # v(A, F)
-            distance_req = self.observation[(action-1)*2]
-            old_waiting_queue = self.observation[1+(action-1)*2]
+            distance_req = self.observation[(action)*2]
+            old_waiting_queue = self.observation[1+(action)*2]
             Rate_trans_req_data = getRateTransData(channel_banwidth=CHANNEL_BANDWIDTH, pr=Pr, distance=distance_req,
                                                    path_loss_exponent=PATH_LOSS_EXPONENT, sigmasquare=SIGMASquare)
 
             # print('rate:', Rate_trans_req_data, distance_req)
             # waiting queue                        # computation required / computation
 
-            time_before_return = self.observation[-3] / (List_COMPUTATION[action-1])       \
-                + max(self.observation[-2]/(Rate_trans_req_data),  # size of task / rate
+            time_before_return = self.observation[0] / (List_COMPUTATION[action-2])       \
+                + max(self.observation[1]/(Rate_trans_req_data),  # size of task / rate
                       old_waiting_queue)
         # base station
-        elif action == 0:
+        elif action == 1:
             # queue time += size of task / computation
-            time_before_return = self.observation[-4] + \
-                self.observation[-3]/(COMPUTATIONAL_CAPACITY_LOCAL)
+            time_before_return = self.observation[3] + \
+                self.observation[0]/(COMPUTATIONAL_CAPACITY_LOCAL)
         # cloud
         else:
             time_before_return = (self.queue[0][2]) / TRANS_RATE_EDGE_TO_CLOUD + \
-                self.observation[-3]/(COMPUTATIONAL_CAPACITY_CLOUD)
+                self.observation[0]/(COMPUTATIONAL_CAPACITY_CLOUD)
 
         return time_before_return, self.observation
 
@@ -422,10 +432,11 @@ class BusEnv(gym.Env):
             self.observation = np.zeros(2 + 2 * NUM_EDGE_SERVER)
             for i in range(NUM_EDGE_SERVER - 1):
                 self.observation[2 *
-                                 i] = self.readexcel(900 + i, self.queue[0][0])
-            self.observation[-3] = self.queue[0][1]
-            self.observation[-2] = self.queue[0][2]
-            self.observation[-1] = self.queue[0][4]
+                                 i + 4] = self.readexcel(900 + i, self.queue[0][0])
+            
+            self.observation[0] = self.queue[0][1]
+            self.observation[1] = self.queue[0][2]
+            self.observation[2] = self.queue[0][4]
 
             return self.observation
 
@@ -451,14 +462,15 @@ class BusEnv(gym.Env):
         self.data = self.data[self.data[:, 0] != self.data[0][0]]
         self.time = self.queue[0][0]
         for i in range(NUM_EDGE_SERVER - 1):
-            self.observation[2 * i] = self.readexcel(900 + i, self.queue[0][0])
-            self.observation[2 * i + 1] = max(
-                0, self.observation[2 * i + 1]-(self.time-self.time_last))
-        self.observation[-4] = max(0, self.observation[-4] -
+            self.observation[2 * i + 4] = self.readexcel(900 + i, self.queue[0][0])
+            self.observation[2 * i + 5] = max(
+                0, self.observation[2 * i + 5]-(self.time-self.time_last))
+        self.observation[3] = max(0, self.observation[3] -
                                    (self.time-self.time_last))
-        self.observation[-3] = self.queue[0][1]
-        self.observation[-2] = self.queue[0][2]
-        self.observation[-1] = self.queue[0][4]
+        
+        self.observation[0] = self.queue[0][1]
+        self.observation[1] = self.queue[0][2]
+        self.observation[2] = self.queue[0][4]
 
         self.time_last = self.data[-1][0]
 

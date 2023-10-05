@@ -32,7 +32,7 @@ Pr = 46
 P = 39.810  # mW
 SIGMASquare = 100  # dBm   background noise power
 PATH_LOSS_EXPONENT = 4  # alpha
-NUM_VEHICLE = 5
+NUM_VEHICLE = 6
 NUM_EDGE_SERVER = NUM_VEHICLE + 1  # a server + vehicles
 List_COMPUTATION = [COMPUTATIONAL_CAPACITY_900] * \
     NUM_VEHICLE + [COMPUTATIONAL_CAPACITY_LOCAL]
