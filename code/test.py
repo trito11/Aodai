@@ -31,6 +31,18 @@ with open('D:/Lab/RL/AODAI_RL/code/dqn_train_trans8.pkl', 'rb') as file:
     train_trans8_ema = pickle.load(file)
 with open('code/dqn_test_trans8.pkl', 'rb') as file:
     test_trans8_ema = pickle.load(file)
+with open('D:/Lab/RL/AODAI_RL/code/dqn_train_trans9.pkl', 'rb') as file:
+    train_trans9_ema = pickle.load(file)
+with open('code/dqn_test_trans9.pkl', 'rb') as file:
+    test_trans9_ema = pickle.load(file)
+with open('D:/Lab/RL/AODAI_RL/code/dqn_train_trans10.pkl', 'rb') as file:
+    train_trans10_ema = pickle.load(file)
+with open('code/dqn_test_trans10.pkl', 'rb') as file:
+    test_trans10_ema = pickle.load(file)
+# with open('D:/Lab/RL/AODAI_RL/code/dqn_train_trans11.pkl', 'rb') as file:
+#     train_trans11_ema = pickle.load(file)
+# with open('code/dqn_test_trans11.pkl', 'rb') as file:
+#     test_trans11_ema = pickle.load(file)
 with open('D:/Lab/RL/AODAI_RL/code/dqn_train_trans_no_ema.pkl', 'rb') as file:
     train_trans_no_ema = pickle.load(file)
 with open('code/dqn_test_trans_no_ema.pkl', 'rb') as file:
@@ -60,12 +72,18 @@ trans2=create_new_array( train_trans4_ema,window_size)
 trans3=create_new_array( train_trans6_ema,window_size)
 trans4=create_new_array( train_trans7_ema,window_size)
 trans5=create_new_array( train_trans8_ema,window_size)
+trans6=create_new_array( train_trans9_ema,window_size)
+trans7=create_new_array( train_trans10_ema,window_size)
+# trans8=create_new_array( train_trans11_ema,window_size)
 tran_no_ema=create_new_array( train_trans_no_ema,window_size)
 
-# plt.plot(test_no_trans2,'g',label='dqn2')
-# plt.plot(test_no_trans1,'r',label='dqn1')
-# plt.plot(test_trans3_ema,'y',label='dqn+trans+ema1')
-# plt.plot(test_trans4_ema,'b',label='dqn+trans+ema2')
+# plt.plot(test_no_trans3,'r',label='dqn')
+# plt.plot(test_trans6_ema,'b',label='dqn+trans+ema')
+# plt.plot(test_trans7_ema,'y',label='dqn+trans+ema+layer2')
+# plt.plot(test_trans8_ema,'c',label='dqn+trans+ema+layer2,3')
+# plt.plot(test_trans9_ema,'g',label='dqn+trans+ema+layer3')
+
+
 
 
 print(f'no_trans1: {sum(no_trans1)/1089},no_trans2: {sum(no_trans2)/1089}, trans: {sum(trans)/1089}, trans1: {sum(trans1)/1089}, tran_no_ema: {sum(tran_no_ema)/1089}')
@@ -74,13 +92,13 @@ print(f'no_trans1: {sum(no_trans1)/1089},no_trans2: {sum(no_trans2)/1089}, trans
 
 plt.plot(no_trans3,'r',label="dqn1")
 plt.plot(trans3,'b',label='dqn+trans+ema')
-plt.plot(trans4,'y',label='dqn+trans+ema+layer2')
-plt.plot(trans5,'c',label='dqn+trans+ema+layer2,3')
-# plt.plot(trans2,'g',label='dqn+trans+ema3')
+plt.plot(trans4,'y',label='dqn+trans+ema+freeze_layer2')
+plt.plot(trans5,'c',label='dqn+trans+ema+freeze_layer2,3')
+plt.plot(trans6,'g',label='dqn+trans+ema+freeze_layer3')
 
 
 plt.xlabel('time_slot')
-plt.ylabel('Sum reward every 33 episodes')
+plt.ylabel('Sum reward every iter')
 plt.legend()
 plt.show()
 
